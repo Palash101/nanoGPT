@@ -39,7 +39,10 @@ always_save_checkpoint = False
 batch_size = 1
 gradient_accumulation_steps = 32
 block_size = 1024  # context length
-max_iters = 2000  # ~3-6 epochs (adjust based on your needs)
+# NOTE: When resuming from a checkpoint, max_iters needs to be higher than the checkpoint's iter_num
+# If your checkpoint is at iter 14000, set this to 14000 + desired_additional_iters
+# For ~2000 more iterations of fine-tuning, set to 16000
+max_iters = 16000  # will continue from checkpoint's iter_num until this value
 
 # fine-tune at constant learning rate (typical for instruction tuning)
 learning_rate = 2e-5  # lower LR for fine-tuning (2e-5 to 3e-5 is common)
