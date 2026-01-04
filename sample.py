@@ -20,6 +20,7 @@ seed = 1337
 device = 'cuda' # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1', etc.
 dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16' # 'float32' or 'bfloat16' or 'float16'
 compile = False # use PyTorch 2.0 to compile the model to be faster
+interactive = False # if True, enter interactive mode to provide prompts repeatedly
 exec(open('configurator.py').read()) # overrides from command line or config file
 # -----------------------------------------------------------------------------
 
@@ -33,6 +34,7 @@ ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=
 
 # model
 if init_from == 'resume':
+    
     # init from a model saved in a specific directory
     ckpt_path = os.path.join(out_dir, 'ckpt.pt')
     checkpoint = torch.load(ckpt_path, map_location=device)
@@ -77,13 +79,47 @@ else:
 if start.startswith('FILE:'):
     with open(start[5:], 'r', encoding='utf-8') as f:
         start = f.read()
-start_ids = encode(start)
-x = (torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...])
 
-# run generation
-with torch.no_grad():
-    with ctx:
-        for k in range(num_samples):
-            y = model.generate(x, max_new_tokens, temperature=temperature, top_k=top_k)
-            print(decode(y[0].tolist()))
-            print('---------------')
+if interactive:
+    # Interactive mode: loop and ask for user input
+    print("\n=== Interactive Mode ===")
+    print("Enter your prompts (or 'quit'/'exit' to stop):\n")
+    
+    with torch.no_grad():
+        with ctx:
+            while True:
+                try:
+                    user_input = input("You: ")
+                    if user_input.lower() in ['quit', 'exit', 'q']:
+                        print("Goodbye!")
+                        break
+                    if not user_input.strip():
+                        continue
+                    
+                    # Encode user input
+                    start_ids = encode(user_input)
+                    x = torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...]
+                    
+                    # Generate response
+                    y = model.generate(x, max_new_tokens, temperature=temperature, top_k=top_k)
+                    response = decode(y[0].tolist())
+                    print(f"\nModel: {response}\n")
+                    print('-' * 50 + '\n')
+                except KeyboardInterrupt:
+                    print("\n\nGoodbye!")
+                    break
+                except EOFError:
+                    print("\n\nGoodbye!")
+                    break
+else:
+    # Non-interactive mode: use the start prompt
+    start_ids = encode(start)
+    x = (torch.tensor(start_ids, dtype=torch.long, device=device)[None, ...])
+
+    # run generation
+    with torch.no_grad():
+        with ctx:
+            for k in range(num_samples):
+                y = model.generate(x, max_new_tokens, temperature=temperature, top_k=top_k)
+                print(decode(y[0].tolist()))
+                print('---------------')
